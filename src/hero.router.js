@@ -33,7 +33,10 @@ heroRouter.get('/:id', async (req, res) => {
     else {
       results = await Hero.findOne({ _id: id }) || {};
 
-      await redisClient.set(id, JSON.stringify(results));
+      await redisClient.set(id, JSON.stringify(results), {
+        EX: 180,
+        NX: true,
+      });
     }
   }
   catch (error) {
