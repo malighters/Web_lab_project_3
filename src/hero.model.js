@@ -16,5 +16,5 @@ heroSchema.set('toJSON', {
     }
   });
 
-const Hero = mongoose.model('Image', heroSchema);
+const Hero = mongoose.model('Hero', heroSchema);
 module.exports = Hero;

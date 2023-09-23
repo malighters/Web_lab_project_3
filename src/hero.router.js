@@ -1,10 +1,14 @@
 const express = require('express');
 const redis = require('redis');
+const amqp = require('amqplib');
 const Hero = require('./hero.model');
 
 const heroRouter = express.Router();
 
 let redisClient;
+let rabbitmqChannel;
+
+const queueName = 'Hero_adding_queue';
 
 (async () => {
   redisClient = redis.createClient();
@@ -12,6 +16,17 @@ let redisClient;
   redisClient.on("error", (error) => console.error(`Error : ${error}`));
 
   await redisClient.connect();
+  console.log('Connected to Redis');
+})();
+
+(async () => {
+  try {
+    const connection = await amqp.connect(process.env.RABBITMQ_URI);
+    rabbitmqChannel = await connection.createChannel();
+    console.log('Connected to RabbitMQ');
+  } catch (error) {
+    console.error('Error while connecting to RabbitMQ:', error);
+  }
 })();
 
 heroRouter.get('/', async (req, res) => {
@@ -31,7 +46,7 @@ heroRouter.get('/:id', async (req, res) => {
       results = JSON.parse(cacheResults);
     }
     else {
-      results = await Hero.findOne({ _id: id }) || {};
+      results = await Hero.findById(id) || {};
 
       await redisClient.set(id, JSON.stringify(results), {
         EX: 180,
@@ -53,10 +68,37 @@ heroRouter.get('/:id', async (req, res) => {
 heroRouter.post('/', async (req, res) => {
   const body = req.body;
 
-  const hero = new Hero(body);
-  await hero.save();
+  try {
+    await rabbitmqChannel.assertQueue(queueName);
+    rabbitmqChannel.sendToQueue(queueName, Buffer.from(JSON.stringify(body)));
 
-  res.json(hero);
+    return res.status(201).send('The message has been sent to a queue successfully');
+  }
+  catch (error) {
+    console.error('Error while sending a message:', error);
+    return res.status(500).send('Server error');
+  }
+
+  // const hero = new Hero(body);
+  // await hero.save();
+
+  // res.json(hero);
 });
+
+heroRouter.post('/process', async (req, res) => {
+  rabbitmqChannel.consume(queueName, async (message) => {
+    if (message !== null) {
+      const content = JSON.parse(message.content);
+      console.log('Got message:', content);
+
+      const hero = new Hero(content);
+      await hero.save();
+
+      rabbitmqChannel.ack(message);
+    }
+  });
+
+  res.status(200).send('We started processing messages from a queue');
+})
 
 module.exports = heroRouter;

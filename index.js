@@ -10,7 +10,7 @@ app.use(express.json());
 app.use(heroRouter);
 
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('The app has been connected to database'))
+  .then(() => console.log('Connected to MongoDB'))
   .catch(() => console.log('Something happened, try again later'));
 
 const PORT = process.env.PORT || '3000';
