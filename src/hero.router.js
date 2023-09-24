@@ -68,6 +68,10 @@ heroRouter.get('/:id', async (req, res) => {
 heroRouter.post('/', async (req, res) => {
   const body = req.body;
 
+  if(!body.name || !body.desc || !body.mainCharacteristic || !body.origin || !body.birthDate || !body.gender) {
+    return res.status(400).send(`Missing some data, we can't add your hero to a database`);
+  }
+
   try {
     await rabbitmqChannel.assertQueue(queueName);
     rabbitmqChannel.sendToQueue(queueName, Buffer.from(JSON.stringify(body)));
